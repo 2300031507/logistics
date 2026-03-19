@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardOverview } from './components/DashboardOverview';
 import { ClaimsAnalysis } from './components/ClaimsAnalysis';
 import { PremiumOptimization } from './components/PremiumOptimization';
@@ -30,21 +30,7 @@ function App() {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
-  useEffect(() => {
-    initializeData();
-  }, []);
-
-  useEffect(() => {
-    if (!dataInitialized || !autoRefreshEnabled) return;
-
-    const timer = setInterval(() => {
-      refreshOperationalData();
-    }, 30000);
-
-    return () => clearInterval(timer);
-  }, [dataInitialized, autoRefreshEnabled]);
-
-  async function initializeData() {
+  const initializeData = useCallback(async () => {
     setIsInitializing(true);
     const success = await generateSampleData();
     setDataInitialized(success);
@@ -52,9 +38,13 @@ function App() {
       setLastRefreshAt(new Date());
     }
     setIsInitializing(false);
-  }
+  }, []);
 
-  async function refreshOperationalData() {
+  useEffect(() => {
+    initializeData();
+  }, [initializeData]);
+
+  const refreshOperationalData = useCallback(async () => {
     if (isRefreshing) return;
 
     try {
@@ -67,7 +57,17 @@ function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }
+  }, [isRefreshing]);
+
+  useEffect(() => {
+    if (!dataInitialized || !autoRefreshEnabled) return;
+
+    const timer = setInterval(() => {
+      refreshOperationalData();
+    }, 30000);
+
+    return () => clearInterval(timer);
+  }, [dataInitialized, autoRefreshEnabled, refreshOperationalData]);
 
   const navigationItems = [
     { id: 'overview' as View, label: 'Dashboard', icon: LayoutDashboard },

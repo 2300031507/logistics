@@ -35,8 +35,7 @@ function firstDayOfNextMonth(dateString: string): Date {
 
 export async function generateSampleData(): Promise<boolean> {
   try {
-    const db = supabase as any;
-    const existingProducts = await db.from('products').select('id').limit(1);
+    const existingProducts = await supabase.from('products').select('id').limit(1);
     if (existingProducts.data && existingProducts.data.length > 0) {
       return true;
     }
@@ -108,7 +107,7 @@ export async function generateSampleData(): Promise<boolean> {
       }
     ];
 
-    const { data: insertedProducts, error: productsError } = await db
+    const { data: insertedProducts, error: productsError } = await supabase
       .from('products')
       .insert(products)
       .select();
@@ -127,7 +126,7 @@ export async function generateSampleData(): Promise<boolean> {
       }
     }));
 
-    const { error: demographicsError } = await db
+    const { error: demographicsError } = await supabase
       .from('demographics')
       .insert(demographics);
 
@@ -142,7 +141,7 @@ export async function generateSampleData(): Promise<boolean> {
     for (let d = new Date(startDate); d <= endDate; d.setMonth(d.getMonth() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
 
-      insertedProducts.forEach((product: any) => {
+      insertedProducts.forEach((product) => {
         AVAILABLE_REGIONS.forEach(region => {
           const basePolicyCount = Math.floor(Math.random() * 500) + 100;
           const premiumAmount = product.base_premium * basePolicyCount * (0.95 + Math.random() * 0.1);
@@ -189,13 +188,13 @@ export async function generateSampleData(): Promise<boolean> {
       }
     }
 
-    const { error: claimsError } = await db.from('claims').insert(claims);
+    const { error: claimsError } = await supabase.from('claims').insert(claims);
     if (claimsError) throw claimsError;
 
-    const { error: premiumsError } = await db.from('premiums').insert(premiums);
+    const { error: premiumsError } = await supabase.from('premiums').insert(premiums);
     if (premiumsError) throw premiumsError;
 
-    const { error: weatherError } = await db.from('weather_events').insert(weatherEvents);
+    const { error: weatherError } = await supabase.from('weather_events').insert(weatherEvents);
     if (weatherError) throw weatherError;
 
     return true;
@@ -207,8 +206,7 @@ export async function generateSampleData(): Promise<boolean> {
 
 export async function appendLatestOperationalData(): Promise<boolean> {
   try {
-    const db = supabase as any;
-    const latestPremium = await db
+    const latestPremium = await supabase
       .from('premiums')
       .select('premium_date')
       .order('premium_date', { ascending: false })
@@ -228,7 +226,7 @@ export async function appendLatestOperationalData(): Promise<boolean> {
       return true;
     }
 
-    const productsRes = await db
+    const productsRes = await supabase
       .from('products')
       .select('id, base_premium, risk_tier, coverage_amount, active')
       .eq('active', true);
@@ -243,7 +241,7 @@ export async function appendLatestOperationalData(): Promise<boolean> {
     const claims: Claim[] = [];
     const weatherEvents: WeatherEvent[] = [];
 
-    products.forEach((product: any) => {
+    products.forEach((product) => {
       AVAILABLE_REGIONS.forEach(region => {
         const basePolicyCount = Math.floor(Math.random() * 260) + 220;
         const seasonalityFactor = 0.9 + Math.random() * 0.2;
@@ -292,23 +290,23 @@ export async function appendLatestOperationalData(): Promise<boolean> {
     });
 
     if (premiums.length > 0) {
-      const premiumsInsert = await db.from('premiums').insert(premiums);
+      const premiumsInsert = await supabase.from('premiums').insert(premiums);
       if (premiumsInsert.error) throw premiumsInsert.error;
     }
 
     if (claims.length > 0) {
-      const claimsInsert = await db.from('claims').insert(claims);
+      const claimsInsert = await supabase.from('claims').insert(claims);
       if (claimsInsert.error) throw claimsInsert.error;
     }
 
     if (weatherEvents.length > 0) {
-      const weatherInsert = await db.from('weather_events').insert(weatherEvents);
+      const weatherInsert = await supabase.from('weather_events').insert(weatherEvents);
       if (weatherInsert.error) throw weatherInsert.error;
     }
 
     return true;
   } catch (error) {
-    console.error('Error appending latest operational data:', error);
+    console.error('Error appending operational data:', error);
     return false;
   }
 }

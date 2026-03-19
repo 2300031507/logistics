@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { MetricCard } from './MetricCard';
 import { LineChart } from './LineChart';
@@ -51,12 +51,9 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
   const [metrics, setMetrics] = useState<ProfitabilityMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadProfitabilityData();
-  }, [regionFilter, timeWindow, refreshKey]);
-
-  async function loadProfitabilityData() {
+  const loadProfitabilityData = useCallback(async () => {
     try {
+      setLoading(true);
       const [premiumsRes, claimsRes, productsRes] = await Promise.all([
         supabase.from('premiums').select('premium_amount, premium_date, product_id, region'),
         supabase.from('claims').select('claim_amount, claim_date, product_id, status, region'),
@@ -67,10 +64,13 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
       if (claimsRes.error) throw claimsRes.error;
       if (productsRes.error) throw productsRes.error;
 
-      const premiums = ((premiumsRes.data || []) as PremiumRow[]).filter(
+      const premiumsData = (premiumsRes.data || []) as PremiumRow[];
+      const claimsData = (claimsRes.data || []) as ClaimRow[];
+      
+      const premiums = premiumsData.filter(
         premium => matchesRegion(premium.region ?? 'Unknown', regionFilter) && isDateInWindow(premium.premium_date, timeWindow)
       );
-      const claims = ((claimsRes.data || []) as ClaimRow[]).filter(
+      const claims = claimsData.filter(
         claim => matchesRegion(claim.region ?? 'Unknown', regionFilter) && isDateInWindow(claim.claim_date, timeWindow)
       );
       const products = (productsRes.data || []) as ProductRow[];
@@ -100,15 +100,10 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
       });
 
       const months = Object.keys(profitByMonth).sort();
-      const profitTrend = months.map(month => {
-        const monthData = profitByMonth[month];
-        const expenses = monthData.premiums * 0.25;
-        const profit = monthData.premiums - monthData.claims - expenses;
-        return {
-          date: `${month}-01`,
-          value: profit
-        };
-      });
+      const profitTrend = months.map(month => ({
+        date: `${month}-01`,
+        value: profitByMonth[month].premiums - profitByMonth[month].claims - (profitByMonth[month].premiums * 0.25)
+      }));
 
       const prediction = profitTrend.length >= 2
         ? forecastTimeSeries(profitTrend, 6)
@@ -120,33 +115,12 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
             changePercent: 0
           };
 
-      const productProfitability = await Promise.all(
-        products.slice(0, 6).map(async (product) => {
-          const [productPremiums, productClaims] = await Promise.all([
-            supabase.from('premiums').select('premium_amount').eq('product_id', product.id),
-            supabase.from('claims').select('claim_amount').eq('product_id', product.id).eq('status', 'paid')
-          ]);
-
-          const premiumRows = (productPremiums.data || []) as Array<{ premium_amount: number }>;
-          const claimRows = (productClaims.data || []) as Array<{ claim_amount: number }>;
-          const premiumTotal = premiumRows.reduce((sum, p) => sum + Number(p.premium_amount), 0);
-          const claimTotal = claimRows.reduce((sum, c) => sum + Number(c.claim_amount), 0);
-          const expenses = premiumTotal * 0.25;
-          const profit = premiumTotal - claimTotal - expenses;
-          const margin = premiumTotal > 0 ? (profit / premiumTotal) * 100 : 0;
-
-          return {
-            label: product.name.split(' ').slice(0, 2).join(' '),
-            value: margin,
-            color: margin > 15 ? '#10b981' : margin > 5 ? '#f59e0b' : '#ef4444'
-          };
-        })
-      );
-
-      const projectedMonthlyProfit = prediction.forecast.length > 0
-        ? prediction.forecast.reduce((sum, p) => sum + p.value, 0) / prediction.forecast.length
-        : 0;
-      const projectedAnnualProfit = projectedMonthlyProfit * 12;
+      const productProfitability = products.slice(0, 6).map(product => {
+        const productPremiums = premiums.filter(p => p.product_id === product.id).reduce((sum, p) => sum + Number(p.premium_amount), 0);
+        const productClaims = paidClaims.filter(c => c.product_id === product.id).reduce((sum, c) => sum + Number(c.claim_amount), 0);
+        const margin = productPremiums > 0 ? ((productPremiums - productClaims - (productPremiums * 0.25)) / productPremiums) * 100 : 0;
+        return { label: product.name, value: margin };
+      });
 
       setMetrics({
         currentProfit: profitability.profit,
@@ -159,14 +133,18 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
         confidenceLower: prediction.confidenceLower,
         productProfitability,
         forecastTrend: prediction.trend,
-        projectedAnnualProfit
+        projectedAnnualProfit: profitability.profit * (12 / (timeWindow === 'all' ? 36 : timeWindow))
       });
     } catch (error) {
       console.error('Error loading profitability data:', error);
     } finally {
       setLoading(false);
     }
-  }
+  }, [regionFilter, timeWindow, refreshKey]);
+
+  useEffect(() => {
+    loadProfitabilityData();
+  }, [loadProfitabilityData]);
 
   if (loading) {
     return (

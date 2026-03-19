@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { MetricCard } from './MetricCard';
 import { BarChart } from './BarChart';
@@ -45,12 +45,9 @@ export function PremiumOptimization({ regionFilter, timeWindow, refreshKey }: Pr
   const [recommendations, setRecommendations] = useState<ProductRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadOptimizationData();
-  }, [regionFilter, timeWindow, refreshKey]);
-
-  async function loadOptimizationData() {
+  const loadOptimizationData = useCallback(async () => {
     try {
+      setLoading(true);
       const [productsRes, claimsRes] = await Promise.all([
         supabase.from('products').select('*'),
         supabase.from('claims').select('product_id, claim_amount, region, status, claim_date')
@@ -104,7 +101,11 @@ export function PremiumOptimization({ regionFilter, timeWindow, refreshKey }: Pr
     } finally {
       setLoading(false);
     }
-  }
+  }, [regionFilter, timeWindow, refreshKey]);
+
+  useEffect(() => {
+    loadOptimizationData();
+  }, [loadOptimizationData]);
 
   async function applyRecommendations() {
     try {
@@ -114,7 +115,7 @@ export function PremiumOptimization({ regionFilter, timeWindow, refreshKey }: Pr
         updated_at: new Date().toISOString()
       }));
 
-      const { error } = await (supabase.from('products') as any).upsert(updates);
+      const { error } = await supabase.from('products').upsert(updates);
 
       if (error) throw error;
 

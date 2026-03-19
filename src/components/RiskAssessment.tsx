@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { MetricCard } from './MetricCard';
 import { BarChart } from './BarChart';
@@ -37,6 +37,12 @@ interface WeatherEventRow {
   region: string;
 }
 
+interface RiskFactors {
+  crime_rate?: number;
+  natural_disaster_frequency?: number;
+  healthcare_access?: number;
+}
+
 interface DemographicRow {
   region: string;
   risk_factors: Record<string, unknown>;
@@ -52,12 +58,9 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
   const [metrics, setMetrics] = useState<RiskMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadRiskData();
-  }, [regionFilter, timeWindow, refreshKey]);
-
-  async function loadRiskData() {
+  const loadRiskData = useCallback(async () => {
     try {
+      setLoading(true);
       const [claimsRes, weatherRes, demographicsRes] = await Promise.all([
         supabase.from('claims').select('claim_amount, region, claim_date, status'),
         supabase.from('weather_events').select('*'),
@@ -98,8 +101,9 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
         const regionClaims = claimsByRegion[region];
         const weatherCount = weatherByRegion[region] || 0;
         const demographic = demographics.find(d => d.region === region);
-        const demographicRisk = demographic
-          ? (demographic.risk_factors as any).natural_disaster_frequency * 5 || 0
+        const riskFactors = demographic?.risk_factors as RiskFactors | undefined;
+        const demographicRisk = riskFactors?.natural_disaster_frequency
+          ? riskFactors.natural_disaster_frequency * 5
           : 0;
 
         const risk = assessRisk(regionClaims, weatherCount, demographicRisk);
@@ -118,9 +122,10 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
 
       const overallClaimAmounts = paidClaims.map(c => Number(c.claim_amount));
       const overallWeatherEvents = weatherEvents.length;
-      const avgDemographicRisk = demographics.reduce((sum, d) =>
-        sum + ((d.risk_factors as any).natural_disaster_frequency || 0) * 5, 0
-      ) / demographics.length;
+      const avgDemographicRisk = demographics.reduce((sum, d) => {
+        const riskFactors = d.risk_factors as RiskFactors | undefined;
+        return sum + (riskFactors?.natural_disaster_frequency || 0) * 5;
+      }, 0) / demographics.length;
 
       const overallRisk = overallClaimAmounts.length > 0
         ? assessRisk(overallClaimAmounts, overallWeatherEvents, Number.isFinite(avgDemographicRisk) ? avgDemographicRisk : 0)
@@ -165,9 +170,13 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
     } catch (error) {
       console.error('Error loading risk data:', error);
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }
+  }, [regionFilter, timeWindow, refreshKey]);
+
+  useEffect(() => {
+    loadRiskData();
+  }, [loadRiskData]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { MetricCard } from './MetricCard';
 import { LineChart } from './LineChart';
@@ -48,12 +48,9 @@ export function DashboardOverview({ regionFilter, timeWindow, refreshKey }: Dash
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadMetrics();
-  }, [regionFilter, timeWindow, refreshKey]);
-
-  async function loadMetrics() {
+  const loadMetrics = useCallback(async () => {
     try {
+      setLoading(true);
       const [premiumsRes, claimsRes, productsRes] = await Promise.all([
         supabase.from('premiums').select('premium_amount, premium_date, region, product_id'),
         supabase.from('claims').select('claim_amount, claim_date, status, region'),
@@ -134,7 +131,11 @@ export function DashboardOverview({ regionFilter, timeWindow, refreshKey }: Dash
     } finally {
       setLoading(false);
     }
-  }
+  }, [regionFilter, timeWindow, refreshKey]);
+
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
 
   if (loading) {
     return (

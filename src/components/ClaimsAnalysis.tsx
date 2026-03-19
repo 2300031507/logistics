@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { MetricCard } from './MetricCard';
 import { LineChart } from './LineChart';
@@ -40,12 +40,9 @@ export function ClaimsAnalysis({ regionFilter, timeWindow, refreshKey }: ClaimsA
   const [metrics, setMetrics] = useState<ClaimsMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadClaimsData();
-  }, [regionFilter, timeWindow, refreshKey]);
-
-  async function loadClaimsData() {
+  const loadClaimsData = useCallback(async () => {
     try {
+      setLoading(true);
       const { data: claims, error } = await supabase
         .from('claims')
         .select('claim_amount, claim_date, severity, region, weather_related, status');
@@ -100,23 +97,21 @@ export function ClaimsAnalysis({ regionFilter, timeWindow, refreshKey }: ClaimsA
         { label: 'Catastrophic', value: paidClaims.filter(c => c.severity === 'catastrophic').length, color: '#991b1b' }
       ];
 
-      const claimsByRegion = Object.entries(
-        paidClaims.reduce((acc, c) => {
-          acc[c.region] = (acc[c.region] || 0) + Number(c.claim_amount);
-          return acc;
-        }, {} as Record<string, number>)
-      ).map(([label, value]) => ({ label, value }));
+      const regionCounts = paidClaims.reduce((acc, c) => {
+        acc[c.region] = (acc[c.region] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
-      const avgMonthlyPolicies = 50000;
-      const claimFrequency = months.length > 0
-        ? (totalClaims / months.length / avgMonthlyPolicies) * 100
-        : 0;
+      const claimsByRegion = Object.keys(regionCounts).map(region => ({
+        label: region,
+        value: regionCounts[region]
+      }));
 
       setMetrics({
         totalClaims,
         averageClaimSize,
         weatherRelatedPercent,
-        claimFrequency,
+        claimFrequency: totalClaims / (timeWindow === 'all' ? 36 : timeWindow),
         claimsTrend,
         forecast: prediction.forecast,
         confidenceUpper: prediction.confidenceUpper,
@@ -130,7 +125,11 @@ export function ClaimsAnalysis({ regionFilter, timeWindow, refreshKey }: ClaimsA
     } finally {
       setLoading(false);
     }
-  }
+  }, [regionFilter, timeWindow, refreshKey]);
+
+  useEffect(() => {
+    loadClaimsData();
+  }, [loadClaimsData]);
 
   if (loading) {
     return (
