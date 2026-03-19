@@ -170,7 +170,7 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
     } catch (error) {
       console.error('Error loading risk data:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }, [regionFilter, timeWindow, refreshKey]);
 
