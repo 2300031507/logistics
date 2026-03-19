@@ -131,11 +131,11 @@ export function DashboardOverview({ regionFilter, timeWindow, refreshKey }: Dash
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, timeWindow, refreshKey]);
+  }, [regionFilter, timeWindow]);
 
   useEffect(() => {
     loadMetrics();
-  }, [loadMetrics]);
+  }, [loadMetrics, refreshKey]);
 
   if (loading) {
     return (

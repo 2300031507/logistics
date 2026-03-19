@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './supabase';
 import type { Database } from './database.types';
 
@@ -107,13 +108,15 @@ export async function generateSampleData(): Promise<boolean> {
       }
     ];
 
-    const { data: insertedProducts, error: productsError } = await supabase
-      .from('products')
+    const { data: insertedProducts, error: productsError } = await (supabase
+      .from('products') as any)
       .insert(products)
       .select();
 
     if (productsError) throw productsError;
     if (!insertedProducts) throw new Error('Failed to insert products');
+
+    const typedProducts = insertedProducts as Database['public']['Tables']['products']['Row'][];
 
     const demographics: Demographic[] = AVAILABLE_REGIONS.map(region => ({
       region,
@@ -126,8 +129,8 @@ export async function generateSampleData(): Promise<boolean> {
       }
     }));
 
-    const { error: demographicsError } = await supabase
-      .from('demographics')
+    const { error: demographicsError } = await (supabase
+      .from('demographics') as any)
       .insert(demographics);
 
     if (demographicsError) throw demographicsError;
@@ -141,7 +144,7 @@ export async function generateSampleData(): Promise<boolean> {
     for (let d = new Date(startDate); d <= endDate; d.setMonth(d.getMonth() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
 
-      insertedProducts.forEach((product) => {
+      typedProducts.forEach((product) => {
         AVAILABLE_REGIONS.forEach(region => {
           const basePolicyCount = Math.floor(Math.random() * 500) + 100;
           const premiumAmount = product.base_premium * basePolicyCount * (0.95 + Math.random() * 0.1);
@@ -188,13 +191,13 @@ export async function generateSampleData(): Promise<boolean> {
       }
     }
 
-    const { error: claimsError } = await supabase.from('claims').insert(claims);
+    const { error: claimsError } = await (supabase.from('claims') as any).insert(claims);
     if (claimsError) throw claimsError;
 
-    const { error: premiumsError } = await supabase.from('premiums').insert(premiums);
+    const { error: premiumsError } = await (supabase.from('premiums') as any).insert(premiums);
     if (premiumsError) throw premiumsError;
 
-    const { error: weatherError } = await supabase.from('weather_events').insert(weatherEvents);
+    const { error: weatherError } = await (supabase.from('weather_events') as any).insert(weatherEvents);
     if (weatherError) throw weatherError;
 
     return true;
@@ -215,11 +218,13 @@ export async function appendLatestOperationalData(): Promise<boolean> {
 
     if (latestPremium.error) throw latestPremium.error;
 
-    if (!latestPremium.data?.premium_date) {
+    const latestData = latestPremium.data as Database['public']['Tables']['premiums']['Row'] | null;
+
+    if (!latestData?.premium_date) {
       return generateSampleData();
     }
 
-    const monthToGenerate = firstDayOfNextMonth(latestPremium.data.premium_date);
+    const monthToGenerate = firstDayOfNextMonth(latestData.premium_date);
     const currentMonthStart = firstDayOfCurrentMonth();
 
     if (monthToGenerate > currentMonthStart) {
@@ -233,7 +238,7 @@ export async function appendLatestOperationalData(): Promise<boolean> {
 
     if (productsRes.error) throw productsRes.error;
 
-    const products = productsRes.data || [];
+    const products = (productsRes.data || []) as Database['public']['Tables']['products']['Row'][];
     if (products.length === 0) return true;
 
     const dateStr = getMonthKey(monthToGenerate);
@@ -290,17 +295,17 @@ export async function appendLatestOperationalData(): Promise<boolean> {
     });
 
     if (premiums.length > 0) {
-      const premiumsInsert = await supabase.from('premiums').insert(premiums);
+      const premiumsInsert = await (supabase.from('premiums') as any).insert(premiums);
       if (premiumsInsert.error) throw premiumsInsert.error;
     }
 
     if (claims.length > 0) {
-      const claimsInsert = await supabase.from('claims').insert(claims);
+      const claimsInsert = await (supabase.from('claims') as any).insert(claims);
       if (claimsInsert.error) throw claimsInsert.error;
     }
 
     if (weatherEvents.length > 0) {
-      const weatherInsert = await supabase.from('weather_events').insert(weatherEvents);
+      const weatherInsert = await (supabase.from('weather_events') as any).insert(weatherEvents);
       if (weatherInsert.error) throw weatherInsert.error;
     }
 

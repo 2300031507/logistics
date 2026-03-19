@@ -140,11 +140,11 @@ export function ProfitabilityForecast({ regionFilter, timeWindow, refreshKey }: 
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, timeWindow, refreshKey]);
+  }, [regionFilter, timeWindow]);
 
   useEffect(() => {
     loadProfitabilityData();
-  }, [loadProfitabilityData]);
+  }, [loadProfitabilityData, refreshKey]);
 
   if (loading) {
     return (

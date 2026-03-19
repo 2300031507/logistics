@@ -101,11 +101,11 @@ export function PremiumOptimization({ regionFilter, timeWindow, refreshKey }: Pr
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, timeWindow, refreshKey]);
+  }, [regionFilter, timeWindow]);
 
   useEffect(() => {
     loadOptimizationData();
-  }, [loadOptimizationData]);
+  }, [loadOptimizationData, refreshKey]);
 
   async function applyRecommendations() {
     try {
@@ -115,6 +115,7 @@ export function PremiumOptimization({ regionFilter, timeWindow, refreshKey }: Pr
         updated_at: new Date().toISOString()
       }));
 
+      // @ts-expect-error - Supabase type inference issue
       const { error } = await supabase.from('products').upsert(updates);
 
       if (error) throw error;

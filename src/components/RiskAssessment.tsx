@@ -172,11 +172,11 @@ export function RiskAssessment({ regionFilter, timeWindow, refreshKey }: RiskAss
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, timeWindow, refreshKey]);
+  }, [regionFilter, timeWindow]);
 
   useEffect(() => {
     loadRiskData();
-  }, [loadRiskData]);
+  }, [loadRiskData, refreshKey]);
 
   if (loading) {
     return (

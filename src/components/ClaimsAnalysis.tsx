@@ -125,11 +125,11 @@ export function ClaimsAnalysis({ regionFilter, timeWindow, refreshKey }: ClaimsA
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, timeWindow, refreshKey]);
+  }, [regionFilter, timeWindow]);
 
   useEffect(() => {
     loadClaimsData();
-  }, [loadClaimsData]);
+  }, [loadClaimsData, refreshKey]);
 
   if (loading) {
     return (
